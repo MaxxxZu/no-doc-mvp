@@ -1,0 +1,20 @@
+[project]
+name = "no-doc-mvp"
+version = "0.1.0"
+description = "MVP: Norwegian document categorization (zero-shot) and NER via FastAPI + Hugging Face"
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [{ name = "Lytics AS" }]
+dependencies = [
+  "fastapi==0.112.0",
+  "uvicorn[standard]==0.30.6",
+  "transformers==4.43.3",
+  "torch==2.3.1",            # CPU wheel will be installed automatically
+  "pydantic==2.8.2",
+  "pydantic-settings==2.3.4",
+  "python-dotenv==1.0.1"
+]
+
+[tool.uv]
+# optional aliases:
+# scripts.api = "uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1"

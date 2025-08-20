@@ -1,0 +1,9 @@
+.hf
+.venv
+.git
+.gitignore
+uv.lock.backup
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
