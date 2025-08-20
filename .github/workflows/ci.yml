@@ -24,11 +24,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
-      - name: Lint with flake8
-        run: uv run flake8 src tests
-
-      - name: Check imports with isort
-        run: uv run isort --check-only src tests
+      - name: Lint (flake8 + isort)
+        run: make lint
 
       - name: Run tests
         run: uv run pytest -v
