@@ -27,6 +27,16 @@ dev = [
 [tool.flake8]
 max-line-length = 99
 extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    ".hf",
+    "dist",
+    ".mypy_cache",
+    ".pytest_cache",
+    "build",
+]
 
 [tool.isort]
 profile = "black"
