@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: no-doc-mvp:latest
+    container_name: no-doc-mvp
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - HF_HOME=/app/.hf
+      - TRANSFORMERS_CACHE=/app/.hf/transformers
+    volumes:
+      - ./.hf:/app/.hf   # persist HF cache
+    command: >
+      uv run uvicorn app:app
+      --host 0.0.0.0
+      --port 8080
+      --workers 1
+    restart: unless-stopped

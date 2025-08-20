@@ -2,19 +2,50 @@
 name = "no-doc-mvp"
 version = "0.1.0"
 description = "MVP: Norwegian document categorization (zero-shot) and NER via FastAPI + Hugging Face"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 readme = "README.md"
-authors = [{ name = "Lytics AS" }]
+authors = [{ name = "Maksym Zyultsle" }]
 dependencies = [
   "fastapi==0.112.0",
   "uvicorn[standard]==0.30.6",
   "transformers==4.43.3",
-  "torch==2.3.1",            # CPU wheel will be installed automatically
+  "torch==2.3.1",
   "pydantic==2.8.2",
   "pydantic-settings==2.3.4",
   "python-dotenv==1.0.1"
 ]
 
-[tool.uv]
-# optional aliases:
-# scripts.api = "uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1"
+[project.optional-dependencies]
+dev = [
+  "httpx",
+  "pytest==8.3.2",
+  "pytest-cov==5.0.0",
+  "flake8==7.1.1",
+  "isort==5.13.2"
+]
+
+[tool.flake8]
+max-line-length = 99
+extend-ignore = ["E203", "W503"]
+
+[tool.isort]
+profile = "black"
+line_length = 99
+combine_as_imports = true
+force_single_line = true
+force_grid_wrap = 0
+include_trailing_comma = true
+multi_line_output = 3
+ensure_newline_before_comments = true
+known_third_party = ["fastapi", "uvicorn", "transformers", "torch", "pydantic", "pydantic_settings"]
+
+
+[tool.pytest.ini_options]
+addopts = "--maxfail=1 --disable-warnings -q"
+testpaths = ["tests"]
+filterwarnings = [
+  "ignore::DeprecationWarning:transformers",
+  "ignore::UserWarning:transformers",
+  "ignore::FutureWarning:transformers",
+  "ignore::ImportWarning:torch"
+]
