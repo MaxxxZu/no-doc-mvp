@@ -59,13 +59,13 @@ uv run uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}
 ## Configuration
 
 All settings are read from .env / environment (see config.py):
-- ZSC_MODEL — zero‑shot model (default: NbAiLab/nb-bert-base-mnli)
-- NER_MODEL — NER model (default: Kushtrim/norbert3-large-ner)
-- ZSC_MULTI_LABEL — allow multiple labels (default: true)
-- ZSC_MAX_LEN — max input chars (default: 2048)
-- HF_HOME, TRANSFORMERS_CACHE — HF caches (improves cold start)
-- PORT — server port (default: 8080)
-- CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
+- NDM_ZSC_MODEL — zero‑shot model (default: NbAiLab/nb-bert-base-mnli)
+- NDM_NER_MODEL — NER model (default: Kushtrim/norbert3-large-ner)
+- NDM_ZSC_MULTI_LABEL — allow multiple labels (default: true)
+- NDM_ZSC_MAX_LEN — max input chars (default: 2048)
+- NDM_HF_HOME, NDM_TRANSFORMERS_CACHE — HF caches (improves cold start)
+- NDM_PORT — server port (default: 8080)
+- NDM_CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
 
 ## Notes
 
@@ -77,3 +77,46 @@ All settings are read from .env / environment (see config.py):
 - [Swagger](http://localhost:8080/docs)
 - [ReDoc](http://localhost:8080/redoc)
 - [Health](http://localhost:8080/healthz)
+
+
+# 🚀 Deployment Guide ( Render, fastest & free)
+
+## 1. Prepare the repo
+
+- Push the `no-doc-mvp/` folder to a **public GitHub repository**.
+- Make sure you have:
+  - `Dockerfile`
+  - `.env.example`
+
+---
+
+## 2. Create the service on Render
+
+1. Log in to [render.com](https://render.com).
+2. Go to **New → Web Service → Build & deploy from a Git repo**.
+3. Select your repository and the desired branch.
+4. Set the following options:
+   - **Environment:** `Docker`
+   - **Instance:** `Free (CPU)`
+   - **Port:** Render will automatically set `$PORT`
+
+---
+
+## 3. Environment Variables
+
+Add the following in **Environment Variables**:
+
+```env
+NDM_ZSC_MODEL=NbAiLab/nb-bert-base-mnli
+NDM_NER_MODEL=Kushtrim/norbert3-large-ner
+NDM_ZSC_MULTI_LABEL=false
+# optional
+NDM_HF_HOME=/app/.hf
+NDM_CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
+```
+
+## 4. Health Check & Verification
+
+- **Health Check Path:** `/healthz`
+- After deployment, open `https://<your-app>.onrender.com/docs` in your browser — you can test the API directly there.
+
