@@ -1,10 +1,16 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # CORS
+    cors_origins: List[str] = Field(
+        default_factory=lambda: ["*"],
+        description="Allowed origins (comma-separated in ENV, parsed by pydantic as list)",
+    )
+
     # models
     zsc_model: str = Field(default="NbAiLab/nb-bert-base-mnli", alias="ZSC_MODEL")
     ner_model: str = Field(default="Kushtrim/norbert3-large-ner", alias="NER_MODEL")

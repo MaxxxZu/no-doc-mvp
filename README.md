@@ -29,17 +29,23 @@ docker compose build --no-cache
 docker compose up
 ```
 
-
 ## Test calls
 
+### health
 ```bash
 curl http://localhost:8080/healthz
+```
 
+## classify
+```bash
 curl -s http://localhost:8080/classify -H "Content-Type: application/json" \
   -d '{"text":"Søknad om igangsettingstillatelse for nybygg ...","labels":["rammetillatelse","igangsettingstillatelse","annet"],"multi_label":false}'
+```
 
+### ner
+```bash
 curl -s http://localhost:8080/ner -H "Content-Type: application/json" \
-  -d '{"text":"AF Gruppen er hovedentreprenør. Arkitekt er Snøhetta AS i Oslo."}'
+  -d '{"text":"AF Gruppen er hovedentreprenør. Arkitekt er Snøhetta AS i Oslo. BRA 120 m², tomteareal 900 m²."}'
 ```
 
 ## Local run (without Docker)
@@ -68,6 +74,6 @@ All settings are read from .env / environment (see config.py):
 
 
 ## Open:
-- [Swagger](https://localhost:8080/docs)
-- [ReDoc](https://localhost:8080/redoc)
-- [Health](https://localhost:8080/healthz)
+- [Swagger](http://localhost:8080/docs)
+- [ReDoc](http://localhost:8080/redoc)
+- [Health](http://localhost:8080/healthz)

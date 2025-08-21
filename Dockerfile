@@ -41,4 +41,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python /usr/local/bin/healthcheck.py
 
-CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+CMD ["sh", "-lc", "uv run uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"]
