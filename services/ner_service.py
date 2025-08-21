@@ -11,8 +11,6 @@ _NER_PIPE = None  # lazy singleton
 def _ensure_hf_cache_env():
     if settings.hf_home:
         os.environ.setdefault("HF_HOME", settings.hf_home)
-    if settings.transformers_cache:
-        os.environ.setdefault("TRANSFORMERS_CACHE", settings.transformers_cache)
 
 
 def _get_pipeline():

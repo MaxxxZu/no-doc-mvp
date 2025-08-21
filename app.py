@@ -15,8 +15,6 @@ async def lifespan(app: FastAPI):
     # Pre-configure HF caches at startup (improves first request latency)
     if settings.hf_home:
         os.environ.setdefault("HF_HOME", settings.hf_home)
-    if settings.transformers_cache:
-        os.environ.setdefault("TRANSFORMERS_CACHE", settings.transformers_cache)
     yield
 
 app = FastAPI(

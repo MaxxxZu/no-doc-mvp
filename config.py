@@ -25,7 +25,6 @@ class Settings(BaseSettings):
 
     # Hugging Face cache
     hf_home: Optional[str] = Field(default=None, alias="HF_HOME")
-    transformers_cache: Optional[str] = Field(default=None, alias="TRANSFORMERS_CACHE")
 
     model_config = SettingsConfigDict(
         env_file=".env",

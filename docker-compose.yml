@@ -11,7 +11,6 @@ services:
       - .env
     environment:
       - HF_HOME=/app/.hf
-      - TRANSFORMERS_CACHE=/app/.hf/transformers
     volumes:
       - ./.hf:/app/.hf   # persist HF cache
     command: >

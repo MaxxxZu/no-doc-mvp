@@ -17,8 +17,7 @@ ENV UV_SYSTEM_PYTHON=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HF_HOME=/app/.hf \
-    TRANSFORMERS_CACHE=/app/.hf/transformers
+    HF_HOME=/app/.hf
 
 # non-root early, so we can COPY with correct ownership (no chown -R)
 RUN useradd -m -U appuser

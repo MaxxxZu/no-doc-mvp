@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 # Ensure tests don't write to your real HF cache
 os.environ.setdefault("HF_HOME", "/tmp/.hf-tests")
-os.environ.setdefault("TRANSFORMERS_CACHE", "/tmp/.hf-tests/transformers")
 
 
 @pytest.fixture(scope="session")

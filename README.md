@@ -63,7 +63,7 @@ All settings are read from .env / environment (see config.py):
 - NDM_NER_MODEL — NER model (default: Kushtrim/norbert3-large-ner)
 - NDM_ZSC_MULTI_LABEL — allow multiple labels (default: true)
 - NDM_ZSC_MAX_LEN — max input chars (default: 2048)
-- NDM_HF_HOME, NDM_TRANSFORMERS_CACHE — HF caches (improves cold start)
+- NDM_HF_HOME — HF cache (improves cold start)
 - NDM_PORT — server port (default: 8080)
 - NDM_CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
 
