@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from models import ClassifyRequest, ClassifyResponse, NerEntity, NerRequest, NerResponse
@@ -18,10 +19,26 @@ async def lifespan(app: FastAPI):
         os.environ.setdefault("TRANSFORMERS_CACHE", settings.transformers_cache)
     yield
 
-app = FastAPI(title="NO Document MVP", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="no-doc-mvp — Classification & NER API",
+    version="0.1.0",
+    description=(
+        "FastAPI service for zero-shot classification and NER on Norwegian text."
+        "Open '/docs' to test requests directly in the browser."
+    ),
+    lifespan=lifespan,
+)
+
+# CORS (from env list)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins or ["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-@app.get("/healthz")
+@app.get("/healthz", tags=["health"])
 def health():
     return {
         "status": "ok",
@@ -30,7 +47,7 @@ def health():
     }
 
 
-@app.post("/classify", response_model=ClassifyResponse)
+@app.post("/classify", response_model=ClassifyResponse, tags=["classification"])
 def classify_endpoint(req: ClassifyRequest):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
@@ -52,7 +69,7 @@ def classify_endpoint(req: ClassifyRequest):
     )
 
 
-@app.post("/ner", response_model=NerResponse)
+@app.post("/ner", response_model=NerResponse, tags=["ner"])
 def ner_endpoint(req: NerRequest):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")

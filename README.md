@@ -1,9 +1,16 @@
 # no-doc-mvp
 Norwegian document MVP (FastAPI + Hugging Face, uv-native)
+FastAPI service for zero-shot classification and NER on Norwegian documents.
+Ready for local run and deployment (Docker). Swagger UI available at /docs.
+
+## Features
 
 MVP service for **Norwegian** document processing:
 - **/classify** — zero‑shot categorization via `NbAiLab/nb-bert-base-mnli`
 - **/ner** — named-entity extraction (ORG/LOC/PER, etc.) via `Kushtrim/norbert3-large-ner`
+- **/healthz** — status and active models
+- Pydantic Settings (SettingsConfigDict), reads from .env/ENV (NDM_ prefix)
+- Examples in Swagger schemas, CORS enabled
 
 No GPU needed. CPU-only.
 
@@ -21,6 +28,7 @@ uv lock            # generates uv.lock (optional but recommended)
 docker compose build --no-cache
 docker compose up
 ```
+
 
 ## Test calls
 
@@ -51,8 +59,15 @@ All settings are read from .env / environment (see config.py):
 - ZSC_MAX_LEN — max input chars (default: 2048)
 - HF_HOME, TRANSFORMERS_CACHE — HF caches (improves cold start)
 - PORT — server port (default: 8080)
+- CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
 
 ## Notes
 
 - Models are cached in ./.hf (mounted to /app/.hf in container). You can delete it to free space; models will re-download on next start.
 - If you need strictly CPU PyTorch wheels, adjust the Dockerfile as commented.
+
+
+## Open:
+- [Swagger](https://localhost:8080/docs)
+- [ReDoc](https://localhost:8080/redoc)
+- [Health](https://localhost:8080/healthz)
