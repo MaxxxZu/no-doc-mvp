@@ -1,6 +1,8 @@
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from transformers import pipeline
+
 from config import settings
 
 _NER_PIPE = None  # lazy singleton

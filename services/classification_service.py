@@ -1,6 +1,8 @@
-from typing import List, Optional, Tuple
 import os
+from typing import List, Optional, Tuple
+
 from transformers import pipeline
+
 from config import settings
 
 DEFAULT_LABELS = [

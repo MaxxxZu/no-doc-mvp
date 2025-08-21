@@ -1,13 +1,12 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
+
 from config import settings
-from models import (
-    ClassifyRequest, ClassifyResponse,
-    NerRequest, NerResponse, NerEntity
-)
+from models import ClassifyRequest, ClassifyResponse, NerEntity, NerRequest, NerResponse
 from services.classification_service import classify_text_raw
 from services.ner_service import extract_entities_raw
-from contextlib import asynccontextmanager
-import os
 
 
 @asynccontextmanager
