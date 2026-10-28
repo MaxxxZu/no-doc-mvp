@@ -5,6 +5,8 @@ from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, EnvSettingsSource, SettingsConfigDict
 from pydantic_settings.sources import SettingsError
 
+from model_specs import NER_MODEL, NER_REVISION, ZSC_MODEL, ZSC_REVISION
+
 
 class Settings(BaseSettings):
     host: str = "0.0.0.0"
@@ -16,13 +18,15 @@ class Settings(BaseSettings):
     )
 
     zsc_model: str = Field(
-        "NbAiLab/nb-bert-base-mnli",
+        ZSC_MODEL,
         validation_alias=AliasChoices("NDM_ZSC_MODEL", "ZSC_MODEL"),
     )
     ner_model: str = Field(
-        "Kushtrim/norbert3-large-ner",
+        NER_MODEL,
         validation_alias=AliasChoices("NDM_NER_MODEL", "NER_MODEL"),
     )
+    zsc_revision: str = ZSC_REVISION
+    ner_revision: str = NER_REVISION
     zsc_multi_label: bool = Field(
         True, validation_alias=AliasChoices("NDM_ZSC_MULTI_LABEL", "ZSC_MULTI_LABEL")
     )
@@ -47,6 +51,13 @@ class Settings(BaseSettings):
     def nonempty_model_id(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("model ID must not be blank")
+        return value
+
+    @field_validator("zsc_revision", "ner_revision")
+    @classmethod
+    def full_model_revision(cls, value: str) -> str:
+        if len(value) != 40 or any(c not in "0123456789abcdef" for c in value):
+            raise ValueError("model revision must be a full lowercase commit SHA")
         return value
 
     @classmethod

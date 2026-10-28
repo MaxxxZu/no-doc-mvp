@@ -1,13 +1,14 @@
 # no-doc-mvp
 Norwegian document MVP (FastAPI + Hugging Face, uv-native)
 FastAPI service for zero-shot classification and NER on Norwegian documents.
-Ready for local run and deployment (Docker). Swagger UI available at /docs.
+Local CPU inference verified on macOS arm64; Linux container verification is pending.
+Swagger UI available at /docs.
 
 ## Features
 
 MVP service for **Norwegian** document processing:
 - **/classify** — zero‑shot categorization via `NbAiLab/nb-bert-base-mnli`
-- **/ner** — named-entity extraction (ORG/LOC/PER, etc.) via `Kushtrim/norbert3-large-ner`
+- **/ner** — named-entity extraction (ORG/LOC/PER, etc.) via `NbAiLab/nb-bert-base-ner`
 - **/healthz** — status and active models
 - Pydantic Settings (SettingsConfigDict), reads from .env/ENV (NDM_ prefix)
 - Examples in Swagger schemas, CORS enabled
@@ -16,15 +17,14 @@ No GPU needed. CPU-only.
 
 ## Stack
 - FastAPI, Uvicorn
-- Hugging Face Transformers
-- `uv` (dependency manager) with `pyproject.toml` + `uv.lock`
+- Python 3.11, PyTorch 2.10.0, NumPy 2.3.2, Transformers 5.10.1
+- `uv==0.13.6` (dependency manager) with `pyproject.toml` + `uv.lock`
 - Docker + docker-compose
 
 ## Quickstart (Docker Compose)
 
 ```bash
 cp .env.example .env
-uv lock            # generates uv.lock (optional but recommended)
 docker compose build --no-cache
 docker compose up
 ```
@@ -52,9 +52,31 @@ curl -s http://localhost:8080/ner -H "Content-Type: application/json" \
 
 ```bash
 uv venv --python 3.11 && source .venv/bin/activate
-uv sync
+uv sync --frozen
 uv run --no-sync python app.py
 ```
+
+## Real-model verification
+
+Install `uv==0.13.6` in your tooling environment, then use `uv sync --frozen --extra dev`.
+Fast tests (`uv run --no-sync pytest`) use fake models and never establish NLP accuracy.
+The real smoke is a separate, explicit operation that downloads the two pinned models:
+
+```bash
+mkdir -p /tmp/no-doc-smoke-cache
+uv run --no-sync python scripts/real_model_smoke.py \
+  --cache-dir /tmp/no-doc-smoke-cache --report /tmp/no-doc-smoke.json
+```
+
+Use a dedicated cache directory. The script checks CPU loading, both zero-shot modes,
+MNLI mapping, NER offsets, API-schema JSON serialization and tensor-to-NumPy, then
+repeats loading and inference in a fresh offline process with socket access blocked.
+It does not read `.env` or run through pytest fixtures. Model/tokenizer revisions are
+shared with the service defaults. Both model cards declare CC BY 4.0; the
+classification repository also contains an Apache 2.0 `LICENSE` at the pinned
+revision. This licensing inconsistency remains unresolved; see the evidence report.
+See [stage 2 evidence](docs/STAGE2_VERIFICATION.md) for exact versions, revisions,
+source links, commands, warnings and platform limitations.
 
 ## Configuration
 
@@ -70,7 +92,9 @@ are not supported. Unknown dotenv keys are ignored.
 Configuration (see `config.py` and `.env.example`):
 
 - NDM_ZSC_MODEL — zero‑shot model (default: NbAiLab/nb-bert-base-mnli)
-- NDM_NER_MODEL — NER model (default: Kushtrim/norbert3-large-ner)
+- NDM_NER_MODEL — NER model (default: NbAiLab/nb-bert-base-ner)
+- NDM_ZSC_REVISION / NDM_NER_REVISION — full 40-character commit SHAs (pinned defaults
+  in `model_specs.py`; update the corresponding revision when overriding a model ID)
 - NDM_ZSC_MULTI_LABEL — allow multiple labels (default: true)
 - NDM_ZSC_MAX_LEN — max input chars (default: 2048)
 - NDM_HF_HOME — HF cache (improves cold start)
@@ -91,7 +115,8 @@ Docker/Compose launch configuration is unchanged in this stage.
 ## Notes
 
 - Models are cached in ./.hf (mounted to /app/.hf in container). You can delete it to free space; models will re-download on next start.
-- If you need strictly CPU PyTorch wheels, adjust the Dockerfile as commented.
+- The lock selects PyTorch CPU wheels for Linux x86_64 and PyPI arm64 wheels for macOS.
+  Other platforms are outside the locked target set. Linux container execution is pending.
 
 
 ## Open:
@@ -129,7 +154,7 @@ Add the following in **Environment Variables**:
 
 ```env
 NDM_ZSC_MODEL=NbAiLab/nb-bert-base-mnli
-NDM_NER_MODEL=Kushtrim/norbert3-large-ner
+NDM_NER_MODEL=NbAiLab/nb-bert-base-ner
 NDM_ZSC_MULTI_LABEL=false
 # optional
 NDM_HF_HOME=/app/.hf

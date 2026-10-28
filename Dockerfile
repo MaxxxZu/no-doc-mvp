@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM ghcr.io/astral-sh/uv:0.4.20 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 FROM python:3.11.5-slim-bookworm AS base
 
 # pull security patches and keep image minimal
@@ -28,7 +28,7 @@ COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 RUN /bin/uv sync --frozen || /bin/uv sync
 
 # application
-COPY --chown=appuser:appuser app.py config.py ./
+COPY --chown=appuser:appuser app.py config.py model_specs.py ./
 COPY --chown=appuser:appuser models ./models
 COPY --chown=appuser:appuser services ./services
 COPY --chown=appuser:appuser healthcheck.py /usr/local/bin/healthcheck.py
