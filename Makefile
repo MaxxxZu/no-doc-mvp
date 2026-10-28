@@ -55,4 +55,4 @@ cov:
 
 # -------- Local run --------
 run:
-	uv run uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
+	uv run --no-sync python app.py
