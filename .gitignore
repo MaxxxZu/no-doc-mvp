@@ -22,3 +22,6 @@ build/
 # IDE
 .vscode/
 .idea/
+
+# local implementation planning
+/docs/IMPLEMENTATION_ROADMAP.md
