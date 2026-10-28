@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import settings
+from config import Settings, settings
 from models import ClassifyRequest, ClassifyResponse, NerEntity, NerRequest, NerResponse
 from services.classification_service import classify_text_raw
 from services.ner_service import extract_entities_raw
@@ -13,39 +13,47 @@ from services.ner_service import extract_entities_raw
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Pre-configure HF caches at startup (improves first request latency)
-    if settings.hf_home:
-        os.environ.setdefault("HF_HOME", settings.hf_home)
+    if app.state.settings.hf_home:
+        os.environ.setdefault("HF_HOME", app.state.settings.hf_home)
     yield
 
-app = FastAPI(
-    title="no-doc-mvp — Classification & NER API",
-    version="0.1.0",
-    description=(
-        "FastAPI service for zero-shot classification and NER on Norwegian text."
-        "Open '/docs' to test requests directly in the browser."
-    ),
-    lifespan=lifespan,
-)
 
-# CORS (from env list)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins or ["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_app(app_settings: Settings = settings) -> FastAPI:
+    application = FastAPI(
+        title="no-doc-mvp — Classification & NER API",
+        version="0.1.0",
+        description=(
+            "FastAPI service for zero-shot classification and NER on Norwegian text."
+            "Open '/docs' to test requests directly in the browser."
+        ),
+        lifespan=lifespan,
+    )
+    application.state.settings = app_settings
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @application.get("/healthz", tags=["health"])
+    def health():
+        return {
+            "status": "ok",
+            "zsc_model": app_settings.zsc_model,
+            "ner_model": app_settings.ner_model,
+        }
+
+    application.add_api_route(
+        "/classify", classify_endpoint, methods=["POST"],
+        response_model=ClassifyResponse, tags=["classification"],
+    )
+    application.add_api_route(
+        "/ner", ner_endpoint, methods=["POST"], response_model=NerResponse, tags=["ner"],
+    )
+    return application
 
 
-@app.get("/healthz", tags=["health"])
-def health():
-    return {
-        "status": "ok",
-        "zsc_model": settings.zsc_model,
-        "ner_model": settings.ner_model,
-    }
-
-
-@app.post("/classify", response_model=ClassifyResponse, tags=["classification"])
 def classify_endpoint(req: ClassifyRequest):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
@@ -67,7 +75,6 @@ def classify_endpoint(req: ClassifyRequest):
     )
 
 
-@app.post("/ner", response_model=NerResponse, tags=["ner"])
 def ner_endpoint(req: NerRequest):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
@@ -86,7 +93,14 @@ def ner_endpoint(req: NerRequest):
     return NerResponse(entities=entities)
 
 
-# Local run (optional)
-if __name__ == "__main__":
+app = create_app()
+
+
+def run():
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=settings.port, reload=True)
+
+    uvicorn.run("app:app", host=settings.host, port=settings.port, workers=1)
+
+
+if __name__ == "__main__":
+    run()

@@ -53,19 +53,40 @@ curl -s http://localhost:8080/ner -H "Content-Type: application/json" \
 ```bash
 uv venv --python 3.11 && source .venv/bin/activate
 uv sync
-uv run uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}
+uv run --no-sync python app.py
 ```
 
 ## Configuration
 
-All settings are read from .env / environment (see config.py):
+Settings use case-insensitive names in both process environment and `.env`.
+Priority: constructor arguments > process environment > `.env` > defaults.
+Within each source, `PORT` overrides `NDM_PORT`; otherwise `NDM_*` overrides
+legacy names. For example, process `NDM_PORT` beats dotenv `PORT`.
+
+Supported legacy aliases: `ZSC_MODEL`, `NER_MODEL`, `ZSC_MULTI_LABEL`,
+`ZSC_MAX_LEN`, `HF_HOME`, and `PORT`. Unprefixed `HOST` and `CORS_ORIGINS`
+are not supported. Unknown dotenv keys are ignored.
+
+Configuration (see `config.py` and `.env.example`):
+
 - NDM_ZSC_MODEL — zero‑shot model (default: NbAiLab/nb-bert-base-mnli)
 - NDM_NER_MODEL — NER model (default: Kushtrim/norbert3-large-ner)
 - NDM_ZSC_MULTI_LABEL — allow multiple labels (default: true)
 - NDM_ZSC_MAX_LEN — max input chars (default: 2048)
 - NDM_HF_HOME — HF cache (improves cold start)
-- NDM_PORT — server port (default: 8080)
-- NDM_CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
+- NDM_HOST — local server host (default: 0.0.0.0)
+- NDM_PORT — server port, 1–65535 (default: 8080; PORT takes priority)
+- NDM_CORS_ORIGINS — JSON array, e.g. `NDM_CORS_ORIGINS=["http://localhost:3000"]`
+
+Compatibility changes: CORS now defaults to `[]` (no origins allowed), and an
+explicit `[]` stays empty. CSV origins are rejected; use a JSON array. Wildcard
+access requires explicitly setting `["*"]`. Ports outside 1–65535, nonpositive
+`NDM_ZSC_MAX_LEN`, and blank model IDs fail configuration loading before startup.
+Previously inconsistent ENV/dotenv alias and case handling is now uniform.
+
+`make run` and `python app.py` use the configured host/port without environment
+synchronization. Direct `uvicorn app:app` uses Uvicorn's own binding options;
+Docker/Compose launch configuration is unchanged in this stage.
 
 ## Notes
 
@@ -112,7 +133,7 @@ NDM_NER_MODEL=Kushtrim/norbert3-large-ner
 NDM_ZSC_MULTI_LABEL=false
 # optional
 NDM_HF_HOME=/app/.hf
-NDM_CORS_ORIGINS=http://localhost:3000,https://my-ror-app.com
+NDM_CORS_ORIGINS=["http://localhost:3000","https://my-ror-app.com"]
 ```
 
 ## 4. Health Check & Verification
