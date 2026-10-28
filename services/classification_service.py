@@ -34,6 +34,10 @@ def _get_pipeline():
         _ZSC_PIPE = pipeline(
             task="zero-shot-classification",
             model=settings.zsc_model,
+            tokenizer=settings.zsc_model,
+            revision=settings.zsc_revision,
+            trust_remote_code=False,
+            model_kwargs={"use_safetensors": True},
             device=-1,  # CPU
         )
     return _ZSC_PIPE

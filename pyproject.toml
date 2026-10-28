@@ -8,8 +8,9 @@ authors = [{ name = "Maksym Zyultsle" }]
 dependencies = [
   "fastapi==0.112.0",
   "uvicorn[standard]==0.30.6",
-  "transformers==4.43.3",
-  "torch==2.3.1",
+  "transformers==5.10.1",
+  "torch==2.10.0",
+  "numpy==2.3.2",
   "pydantic==2.8.2",
   "pydantic-settings==2.3.4",
   "python-dotenv==1.0.1"
@@ -23,6 +24,21 @@ dev = [
   "flake8==7.1.1",
   "isort==5.13.2"
 ]
+
+[tool.uv]
+required-version = "==0.13.6"
+environments = [
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.flake8]
 max-line-length = 99

@@ -20,6 +20,10 @@ def _get_pipeline():
         _NER_PIPE = pipeline(
             task="token-classification",
             model=settings.ner_model,
+            tokenizer=settings.ner_model,
+            revision=settings.ner_revision,
+            trust_remote_code=False,
+            model_kwargs={"use_safetensors": True},
             aggregation_strategy="simple",
             device=-1,  # CPU
         )

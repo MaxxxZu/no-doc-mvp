@@ -44,3 +44,28 @@ def test_ner_service_unit(monkeypatch):
     out = svc.extract_entities_raw("Ola Nordmann")
     assert isinstance(out, list)
     assert out[0]["entity_group"] == "PER"
+
+
+def test_loaders_receive_model_and_tokenizer_revision(monkeypatch):
+    import services.classification_service as classification
+    import services.ner_service as ner
+
+    for service, prefix in ((classification, "zsc"), (ner, "ner")):
+        calls = []
+        sentinel = object()
+
+        def loader(**kwargs):
+            calls.append(kwargs)
+            return sentinel
+
+        monkeypatch.setattr(service.settings, f"{prefix}_revision", "a" * 40)
+        monkeypatch.setattr(service, "pipeline", loader)
+        assert service._get_pipeline() is sentinel
+        assert service._get_pipeline() is sentinel
+        assert len(calls) == 1
+        assert calls[0]["model"] == getattr(service.settings, f"{prefix}_model")
+        assert calls[0]["tokenizer"] == calls[0]["model"]
+        assert calls[0]["revision"] == "a" * 40
+        assert calls[0]["trust_remote_code"] is False
+        assert calls[0]["model_kwargs"] == {"use_safetensors": True}
+        assert calls[0]["device"] == -1

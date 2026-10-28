@@ -7,6 +7,8 @@ VALUES = {
     "NDM_PORT": "9123",
     "NDM_ZSC_MODEL": "test/classifier",
     "NDM_NER_MODEL": "test/ner",
+    "NDM_ZSC_REVISION": "a" * 40,
+    "NDM_NER_REVISION": "b" * 40,
     "NDM_ZSC_MULTI_LABEL": "false",
     "NDM_ZSC_MAX_LEN": "123",
     "NDM_HF_HOME": "/unused/test-cache",
@@ -22,7 +24,9 @@ def test_defaults(monkeypatch):
     assert settings.model_dump() == {
         "host": "0.0.0.0", "port": 8080, "cors_origins": [],
         "zsc_model": "NbAiLab/nb-bert-base-mnli",
-        "ner_model": "Kushtrim/norbert3-large-ner", "zsc_multi_label": True,
+        "ner_model": "NbAiLab/nb-bert-base-ner", "zsc_multi_label": True,
+        "zsc_revision": "171cd472d61d91ad6609530997e63ea98515efcb",
+        "ner_revision": "98083f61535300a7fb6d8b72c26873d47e81ac93",
         "zsc_max_len": 2048, "hf_home": None,
     }
 
@@ -44,6 +48,8 @@ def test_env_dotenv_equivalence(monkeypatch, tmp_path, case):
     assert process.host == "127.0.0.2"
     assert process.zsc_model == "test/classifier"
     assert process.ner_model == "test/ner"
+    assert process.zsc_revision == "a" * 40
+    assert process.ner_revision == "b" * 40
     assert process.zsc_multi_label is False
     assert process.zsc_max_len == 123
     assert process.hf_home == "/unused/test-cache"
@@ -100,6 +106,8 @@ def test_source_priority(monkeypatch, tmp_path, process_key, dotenv_key):
 @pytest.mark.parametrize("key,value", [
     ("NDM_PORT", "0"), ("PORT", "65536"), ("NDM_PORT", "abc"),
     ("NDM_ZSC_MAX_LEN", "0"), ("NDM_ZSC_MAX_LEN", "-1"),
+    ("NDM_ZSC_REVISION", "main"), ("NDM_NER_REVISION", ""),
+    ("NDM_NER_REVISION", "g" * 40),
     ("NDM_ZSC_MODEL", ""), ("NDM_NER_MODEL", "   "),
     ("NDM_ZSC_MULTI_LABEL", "maybe"),
     ("NDM_CORS_ORIGINS", "https://a.example,https://b.example"),
