@@ -1,21 +1,29 @@
-import os
+import asyncio
 from contextlib import asynccontextmanager
+from typing import Any, Callable, TypeVar
 
-from fastapi import FastAPI, HTTPException
+import anyio
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from config import Settings, settings
 from models import ClassifyRequest, ClassifyResponse, NerEntity, NerRequest, NerResponse
 from services.classification_service import classify_text_raw
+from services.model_loader import Operation
 from services.ner_service import extract_entities_raw
+from services.runtime import ModelRuntime, RuntimeBusy, RuntimeUnavailable
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-configure HF caches at startup (improves first request latency)
-    if app.state.settings.hf_home:
-        os.environ.setdefault("HF_HOME", app.state.settings.hf_home)
-    yield
+    runtime = app.state.runtime
+    try:
+        await run_in_threadpool(runtime.initialize)
+        yield
+    finally:
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(runtime.close)
 
 
 def create_app(app_settings: Settings = settings) -> FastAPI:
@@ -29,6 +37,7 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.settings = app_settings
+    application.state.runtime = ModelRuntime(app_settings)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
@@ -44,6 +53,12 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
             "ner_model": app_settings.ner_model,
         }
 
+    @application.get("/readyz", tags=["health"])
+    def ready():
+        if not application.state.runtime.ready:
+            raise HTTPException(status_code=503, detail="models are not ready")
+        return {"status": "ready"}
+
     application.add_api_route(
         "/classify", classify_endpoint, methods=["POST"],
         response_model=ClassifyResponse, tags=["classification"],
@@ -54,14 +69,15 @@ def create_app(app_settings: Settings = settings) -> FastAPI:
     return application
 
 
-def classify_endpoint(req: ClassifyRequest):
+async def classify_endpoint(req: ClassifyRequest, request: Request):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
 
-    labels, scores = classify_text_raw(
-        text=req.text,
-        labels=req.labels,
-        multi_label_override=req.multi_label,
+    runtime = request.app.state.runtime
+    labels, scores = await infer(
+        runtime, "classify", classify_text_raw,
+        text=req.text, pipeline=runtime.classifier, settings=runtime.settings,
+        labels=req.labels, multi_label_override=req.multi_label,
     )
     if not labels:
         raise HTTPException(status_code=400, detail="classification failed")
@@ -75,11 +91,13 @@ def classify_endpoint(req: ClassifyRequest):
     )
 
 
-def ner_endpoint(req: NerRequest):
+async def ner_endpoint(req: NerRequest, request: Request):
     if not req.text or not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
 
-    preds = extract_entities_raw(req.text)
+    runtime = request.app.state.runtime
+    preds = await infer(runtime, "ner", extract_entities_raw,
+                        text=req.text, pipeline=runtime.ner)
     entities = [
         NerEntity(
             entity_group=p["entity_group"],
@@ -91,6 +109,42 @@ def ner_endpoint(req: NerRequest):
         for p in preds
     ]
     return NerResponse(entities=entities)
+
+
+Result = TypeVar("Result")
+
+
+async def infer(
+    runtime: ModelRuntime, operation: Operation, function: Callable[..., Result], **kwargs: Any,
+) -> Result:
+    # Admit before scheduling a worker: busy requests never queue for CPU work.
+    try:
+        with runtime.inference(operation):
+            # Cancellation/HTTP disconnect is not a way to stop PyTorch. Keep the
+            # slot until the worker returns, even if the caller stops waiting.
+            with anyio.CancelScope(shield=True):
+                worker = asyncio.create_task(run_in_threadpool(function, **kwargs))
+                cancelled = False
+                while True:
+                    try:
+                        result = await asyncio.shield(worker)
+                        break
+                    except asyncio.CancelledError:
+                        # Also handle direct asyncio Task.cancel(), which bypasses
+                        # AnyIO shielding. Do not release a running worker's slot.
+                        if worker.cancelled():
+                            raise
+                        cancelled = True
+                if cancelled:
+                    raise asyncio.CancelledError
+                return result
+    except RuntimeBusy:
+        raise HTTPException(503, "inference is busy", headers={"Retry-After": "1"}) from None
+    except RuntimeUnavailable:
+        raise HTTPException(503, "models are not ready", headers={"Retry-After": "1"}) from None
+    except Exception:
+        # Preserve HTTP 500 without logging untrusted exception text or documents.
+        raise HTTPException(500, "inference failed") from None
 
 
 app = create_app()

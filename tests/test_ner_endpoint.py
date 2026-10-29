@@ -1,7 +1,7 @@
 def test_ner_endpoint_happy_path(client, monkeypatch):
     import app as app_module
 
-    def fake_extract_entities_raw(text: str):
+    def fake_extract_entities_raw(text: str, **kwargs):
         return [
             {
                 "entity_group": "ORG",

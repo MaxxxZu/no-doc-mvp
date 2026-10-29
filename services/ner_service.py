@@ -1,38 +1,18 @@
-import os
-from typing import Any, Dict, List
+from typing import List, TypedDict
 
-from transformers import pipeline
-
-from config import settings
-
-_NER_PIPE = None  # lazy singleton
+from services.model_loader import Pipeline
 
 
-def _ensure_hf_cache_env():
-    if settings.hf_home:
-        os.environ.setdefault("HF_HOME", settings.hf_home)
+class NerPrediction(TypedDict):
+    entity_group: str
+    word: str
+    score: float
+    start: int
+    end: int
 
 
-def _get_pipeline():
-    global _NER_PIPE
-    if _NER_PIPE is None:
-        _ensure_hf_cache_env()
-        _NER_PIPE = pipeline(
-            task="token-classification",
-            model=settings.ner_model,
-            tokenizer=settings.ner_model,
-            revision=settings.ner_revision,
-            trust_remote_code=False,
-            model_kwargs={"use_safetensors": True},
-            aggregation_strategy="simple",
-            device=-1,  # CPU
-        )
-    return _NER_PIPE
-
-
-def extract_entities_raw(text: str) -> List[Dict[str, Any]]:
+def extract_entities_raw(text: str, pipeline: Pipeline) -> List[NerPrediction]:
     t = (text or "").strip()
     if not t:
         return []
-    ner = _get_pipeline()
-    return ner(t)
+    return pipeline(t)

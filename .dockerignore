@@ -7,3 +7,27 @@ uv.lock.backup
 **/*.pyc
 **/*.pyo
 **/*.pyd
+
+# local configuration and private verification material
+.env
+.env.*
+!.env.example
+docs/IMPLEMENTATION_ROADMAP.md
+docs/STAGE*_VERIFICATION.md
+docs/evidence/
+AGENTS.md
+CLAUDE.md
+
+# local tooling output and downloaded weights
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.safetensors
+*.pt
+*.pth
+*.ckpt

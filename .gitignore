@@ -25,3 +25,25 @@ build/
 
 # local implementation planning
 /docs/IMPLEMENTATION_ROADMAP.md
+
+# local verification reports and evidence
+/docs/STAGE*_VERIFICATION.md
+/docs/evidence/
+
+# local environment variants (keep the public template)
+.env.*
+!.env.example
+
+# local tooling and coverage output
+.DS_Store
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# downloaded model weights
+*.safetensors
+*.pt
+*.pth
+*.ckpt

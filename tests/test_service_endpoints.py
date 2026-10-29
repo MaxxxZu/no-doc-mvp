@@ -1,6 +1,4 @@
 def test_endpoints_with_real_services_and_fake_pipelines(client, monkeypatch):
-    import services.classification_service as classification
-    import services.ner_service as ner
 
     calls = []
 
@@ -14,8 +12,8 @@ def test_endpoints_with_real_services_and_fake_pipelines(client, monkeypatch):
             "entity_group": "LOC", "word": "Oslo", "score": 0.95, "start": 0, "end": 4,
         }]
 
-    monkeypatch.setattr(classification, "pipeline", lambda **kwargs: fake_zsc)
-    monkeypatch.setattr(ner, "pipeline", lambda **kwargs: fake_ner)
+    client.app.state.runtime.classifier = fake_zsc
+    client.app.state.runtime.ner = fake_ner
     response = client.post("/classify", json={
         "text": "Dette er en test", "labels": ["A", "B"], "multi_label": False,
     })
