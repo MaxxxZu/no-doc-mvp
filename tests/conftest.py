@@ -44,15 +44,25 @@ def isolated_environment(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
     import config
-    import services.classification_service as classification
-    import services.ner_service as ner
+    import services.runtime as runtime
 
     test_settings = config.Settings(_env_file=None)
     monkeypatch.setattr(config, "settings", test_settings)
-    for module, singleton in ((classification, "_ZSC_PIPE"), (ner, "_NER_PIPE")):
-        monkeypatch.setattr(module, "settings", test_settings)
-        monkeypatch.setattr(module, singleton, None)
-        monkeypatch.setattr(module, "pipeline", forbidden_pipeline)
+    real_cpu_config = runtime.configure_cpu_threads
+
+    def fake_cpu_config(threads):
+        pass
+
+    fake_cpu_config.__wrapped__ = real_cpu_config
+    monkeypatch.setattr(runtime, "configure_cpu_threads", fake_cpu_config)
+
+    def fake_loader(operation, settings):
+        if operation == "classify":
+            return lambda **kw: {"labels": kw["candidate_labels"],
+                                 "scores": [0.9] * len(kw["candidate_labels"])}
+        return lambda text: []
+
+    monkeypatch.setattr(runtime, "load_pipeline", fake_loader)
     yield test_settings
 
 

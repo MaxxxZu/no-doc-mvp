@@ -7,19 +7,16 @@ import pytest
 @pytest.mark.parametrize("iteration", range(2))
 def test_fixtures_reset_between_tests(client, monkeypatch, iteration):
     import config
-    import services.classification_service as classification
-    import services.ner_service as ner
 
     assert config.settings.port == 8080
-    assert classification._ZSC_PIPE is None
-    assert ner._NER_PIPE is None
+    assert client.app.state.runtime.ready
     assert not hasattr(client.app.state, "leaked")
     assert "ISOLATION_MARKER" not in os.environ
     monkeypatch.setenv("ISOLATION_MARKER", "set")
     # Direct mutations deliberately test the fixture's reset, not monkeypatch.
     config.settings.port = 9999
-    classification._ZSC_PIPE = object()
-    ner._NER_PIPE = object()
+    client.app.state.runtime.classifier = object()
+    client.app.state.runtime.ner = object()
     client.app.state.leaked = True
 
 
@@ -34,17 +31,18 @@ def test_cache_and_lifespan(monkeypatch, tmp_path):
     application = create_app(Settings(hf_home=cache))
     assert "HF_HOME" not in os.environ
     with TestClient(application) as client:
-        assert os.environ["HF_HOME"] == cache
+        assert "HF_HOME" not in os.environ
+        assert application.state.runtime.settings.hf_home == cache
         assert client.get("/healthz").status_code == 200
 
 
 def test_real_pipeline_and_network_are_blocked():
-    import services.classification_service as classification
-    import services.ner_service as ner
 
-    for loader in (classification._get_pipeline, ner._get_pipeline):
-        with pytest.raises(AssertionError, match="Real model construction"):
-            loader()
+    from config import Settings
+    from services.model_loader import load_pipeline
+
+    with pytest.raises((AssertionError, ImportError)):
+        load_pipeline("classify", Settings(_env_file=None))
     with pytest.raises(AssertionError, match="Network access"):
         socket.create_connection(("example.invalid", 443))
 

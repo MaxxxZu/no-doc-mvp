@@ -12,6 +12,8 @@ VALUES = {
     "NDM_ZSC_MULTI_LABEL": "false",
     "NDM_ZSC_MAX_LEN": "123",
     "NDM_HF_HOME": "/unused/test-cache",
+    "NDM_OFFLINE": "true",
+    "NDM_CPU_THREADS": "3",
     "NDM_CORS_ORIGINS": '["https://allowed.example"]',
 }
 
@@ -27,7 +29,7 @@ def test_defaults(monkeypatch):
         "ner_model": "NbAiLab/nb-bert-base-ner", "zsc_multi_label": True,
         "zsc_revision": "171cd472d61d91ad6609530997e63ea98515efcb",
         "ner_revision": "98083f61535300a7fb6d8b72c26873d47e81ac93",
-        "zsc_max_len": 2048, "hf_home": None,
+        "zsc_max_len": 2048, "hf_home": None, "offline": False, "cpu_threads": 2,
     }
 
 
@@ -44,6 +46,8 @@ def test_env_dotenv_equivalence(monkeypatch, tmp_path, case):
         monkeypatch.setenv(case(key), value)
     process = Settings()
     assert process == dotenv
+    assert process.offline is True
+    assert process.cpu_threads == 3
     assert process.port == 9123
     assert process.host == "127.0.0.2"
     assert process.zsc_model == "test/classifier"
@@ -104,6 +108,8 @@ def test_source_priority(monkeypatch, tmp_path, process_key, dotenv_key):
 
 @pytest.mark.parametrize("source", ["env", "dotenv"])
 @pytest.mark.parametrize("key,value", [
+    ("NDM_CPU_THREADS", "0"), ("NDM_CPU_THREADS", "257"),
+    ("NDM_CPU_THREADS", "abc"), ("NDM_OFFLINE", "maybe"), ("NDM_HF_HOME", ""),
     ("NDM_PORT", "0"), ("PORT", "65536"), ("NDM_PORT", "abc"),
     ("NDM_ZSC_MAX_LEN", "0"), ("NDM_ZSC_MAX_LEN", "-1"),
     ("NDM_ZSC_REVISION", "main"), ("NDM_NER_REVISION", ""),
@@ -118,6 +124,8 @@ def test_source_priority(monkeypatch, tmp_path, process_key, dotenv_key):
 def test_invalid_settings(monkeypatch, tmp_path, source, key, value):
     from config import Settings
 
+    if key == "NDM_HF_HOME":
+        monkeypatch.delenv("HF_HOME")
     if source == "env":
         monkeypatch.setenv(key, value)
     else:

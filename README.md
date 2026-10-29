@@ -1,66 +1,132 @@
 # no-doc-mvp
-Norwegian document MVP (FastAPI + Hugging Face, uv-native)
-FastAPI service for zero-shot classification and NER on Norwegian documents.
-Local CPU inference verified on macOS arm64; Linux container verification is pending.
-Swagger UI available at /docs.
 
-## Features
+A FastAPI service for zero-shot classification and named entity recognition on
+Norwegian text. It applies pretrained Hugging Face models on CPU, with an
+application-owned model lifecycle and bounded inference concurrency.
 
-MVP service for **Norwegian** document processing:
-- **/classify** — zero‑shot categorization via `NbAiLab/nb-bert-base-mnli`
-- **/ner** — named-entity extraction (ORG/LOC/PER, etc.) via `NbAiLab/nb-bert-base-ner`
-- **/healthz** — status and active models
-- Pydantic Settings (SettingsConfigDict), reads from .env/ENV (NDM_ prefix)
-- Examples in Swagger schemas, CORS enabled
+The default classification labels cover Norwegian planning and construction
+documents. Clients can also provide their own candidate labels.
 
-No GPU needed. CPU-only.
+## Architecture
 
-## Stack
-- FastAPI, Uvicorn
-- Python 3.11, PyTorch 2.10.0, NumPy 2.3.2, Transformers 5.10.1
-- `uv==0.13.6` (dependency manager) with `pyproject.toml` + `uv.lock`
-- Docker + docker-compose
+- **API:** FastAPI routes and Pydantic request/response schemas.
+- **Services:** classification and entity-extraction logic.
+- **Runtime:** sequential startup loading, readiness, a shared inference slot and
+  graceful shutdown.
+- **Models:** pinned BERT/MNLI and NER artifacts loaded with fast tokenizers,
+  safetensors and remote code disabled.
+- **Configuration:** Pydantic Settings, environment variables and optional `.env`.
 
-## Quickstart (Docker Compose)
+Python 3.11, PyTorch 2.10.0, NumPy 2.3.2 and Transformers 5.10.1 are locked with
+`uv==0.13.6`. The lock targets macOS arm64 and Linux x86_64; Linux selects PyTorch
+CPU wheels. Other platforms are outside the current locked target set.
+
+## Local quickstart
+
+Prerequisites: Python 3.11, `uv==0.13.6`, network access for the first model download,
+and disk/RAM capacity for both models. Run these commands from the repository root:
 
 ```bash
-cp .env.example .env
-docker compose build --no-cache
-docker compose up
+uv sync --frozen
+NDM_HF_HOME=.hf uv run --no-sync python app.py
 ```
 
-## Test calls
+The service loads both pinned models before accepting requests. Later starts reuse
+cached artifacts. The local launcher uses the configured host and port, defaulting
+to `0.0.0.0:8080`, with one Uvicorn worker.
 
-### health
+Configuration can also be placed in `.env`; see [.env.example](.env.example).
+For local use, choose a writable cache path such as `.hf` rather than the template's
+container path `/app/.hf`.
+
+- [Swagger UI](http://localhost:8080/docs)
+- [ReDoc](http://localhost:8080/redoc)
+- [Liveness](http://localhost:8080/healthz)
+- [Readiness](http://localhost:8080/readyz)
+
+## API
+
+Inputs are extracted text supplied as JSON. Examples below are illustrative inputs;
+model quality has not been evaluated on a labeled benchmark.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /classify` | Ranked candidate labels, scores and the top result |
+| `POST /ner` | Entity groups, text, scores and character offsets |
+| `GET /healthz` | Cheap liveness and configured model IDs |
+| `GET /readyz` | 200 when both required models are ready; otherwise 503 |
+
 ```bash
 curl http://localhost:8080/healthz
+
+curl http://localhost:8080/classify \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Oslo kommune behandler en søknad om byggetillatelse.","labels":["byggesøknad","sport"],"multi_label":false}'
+
+curl http://localhost:8080/ner \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Ola Nordmann arbeider i Oslo kommune i Norge."}'
 ```
 
-## classify
+Both inference routes share one slot per process. Busy requests receive 503 with
+`Retry-After: 1`. CPU work runs in a worker thread; cancelling an HTTP request does
+not stop a running PyTorch call. Shutdown waits for active inference before clearing
+runtime references. Immediate return of all RAM to the OS is not guaranteed.
+
+## Configuration
+
+Names are case-insensitive in process environment and `.env`.
+Priority: constructor arguments > process environment > `.env` > defaults.
+Within each source, `PORT` overrides `NDM_PORT`; other `NDM_*` names override legacy
+aliases. Process `NDM_PORT`, for example, takes precedence over dotenv `PORT`.
+
+| Variable | Default / meaning |
+| --- | --- |
+| `NDM_HOST` | `0.0.0.0`; local launcher binding |
+| `NDM_PORT` / `PORT` | `8080`; range 1–65535 |
+| `NDM_CORS_ORIGINS` | `[]`; JSON array of allowed origins |
+| `NDM_HF_HOME` | Unset; artifact cache directory passed directly as `cache_dir` |
+| `NDM_OFFLINE` | `false`; when true, incomplete cache fails startup |
+| `NDM_CPU_THREADS` | `2`; PyTorch intra-op threads, range 1–256 |
+| `NDM_ZSC_MODEL` | `NbAiLab/nb-bert-base-mnli` |
+| `NDM_NER_MODEL` | `NbAiLab/nb-bert-base-ner` |
+| `NDM_ZSC_REVISION` / `NDM_NER_REVISION` | Full commit SHAs pinned in [model_specs.py](model_specs.py) |
+| `NDM_ZSC_MULTI_LABEL` | `true`; request-level override supported |
+| `NDM_ZSC_MAX_LEN` | `2048`; current classification character cutoff |
+
+Supported legacy aliases are `ZSC_MODEL`, `NER_MODEL`, `ZSC_MULTI_LABEL`,
+`ZSC_MAX_LEN`, `HF_HOME` and `PORT`. Unprefixed `HOST` and `CORS_ORIGINS` are ignored.
+Unknown dotenv keys are ignored. Invalid ports, nonpositive classification limits,
+blank model IDs/cache paths and malformed revisions fail configuration loading.
+
+CORS example: `NDM_CORS_ORIGINS=["http://localhost:3000"]`. An empty list permits no
+cross-origin clients; wildcard access must be explicit. CSV and `null` are rejected.
+CORS is a browser policy, not API authentication.
+
+`NDM_HF_HOME` and its legacy alias select the artifact directory itself: no `hub/`
+suffix is appended. To reuse an older cache at `<HF_HOME>/hub`, select that directory
+directly. CPU thread policy is process-wide; apps in one process must agree.
+Changing a model ID requires a matching reviewed revision and a fresh model check.
+
+`make run` uses the same local launcher. Direct `uvicorn app:app` uses Uvicorn's
+own host/port options.
+
+## Tests and reproducible smoke checks
+
 ```bash
-curl -s http://localhost:8080/classify -H "Content-Type: application/json" \
-  -d '{"text":"Søknad om igangsettingstillatelse for nybygg ...","labels":["rammetillatelse","igangsettingstillatelse","annet"],"multi_label":false}'
+uv sync --frozen --extra dev
+uv run --no-sync pytest
+uv run --no-sync flake8 .
+uv run --no-sync isort . --check-only --filter-files
 ```
 
-### ner
-```bash
-curl -s http://localhost:8080/ner -H "Content-Type: application/json" \
-  -d '{"text":"AF Gruppen er hovedentreprenør. Arkitekt er Snøhetta AS i Oslo. BRA 120 m², tomteareal 900 m²."}'
-```
+Fast tests use fake models and cover configuration, CORS, lifecycle, concurrent
+admission, cancellation, shutdown and API behavior. They do not download weights
+or establish NLP accuracy.
 
-## Local run (without Docker)
-
-```bash
-uv venv --python 3.11 && source .venv/bin/activate
-uv sync --frozen
-uv run --no-sync python app.py
-```
-
-## Real-model verification
-
-Install `uv==0.13.6` in your tooling environment, then use `uv sync --frozen --extra dev`.
-Fast tests (`uv run --no-sync pytest`) use fake models and never establish NLP accuracy.
-The real smoke is a separate, explicit operation that downloads the two pinned models:
+The separate model smoke downloads the pinned models into a dedicated cache,
+checks CPU inference, both zero-shot modes, MNLI mapping, NER offsets and JSON
+serialization, then repeats loading/inference in a fresh offline process:
 
 ```bash
 mkdir -p /tmp/no-doc-smoke-cache
@@ -68,101 +134,40 @@ uv run --no-sync python scripts/real_model_smoke.py \
   --cache-dir /tmp/no-doc-smoke-cache --report /tmp/no-doc-smoke.json
 ```
 
-Use a dedicated cache directory. The script checks CPU loading, both zero-shot modes,
-MNLI mapping, NER offsets, API-schema JSON serialization and tensor-to-NumPy, then
-repeats loading and inference in a fresh offline process with socket access blocked.
-It does not read `.env` or run through pytest fixtures. Model/tokenizer revisions are
-shared with the service defaults. Both model cards declare CC BY 4.0; the
-classification repository also contains an Apache 2.0 `LICENSE` at the pinned
-revision. This licensing inconsistency remains unresolved; see the evidence report.
-See [stage 2 evidence](docs/STAGE2_VERIFICATION.md) for exact versions, revisions,
-source links, commands, warnings and platform limitations.
+After this cache has been populated, check the application lifecycle and both API
+endpoints offline without starting a listening server:
 
-## Configuration
-
-Settings use case-insensitive names in both process environment and `.env`.
-Priority: constructor arguments > process environment > `.env` > defaults.
-Within each source, `PORT` overrides `NDM_PORT`; otherwise `NDM_*` overrides
-legacy names. For example, process `NDM_PORT` beats dotenv `PORT`.
-
-Supported legacy aliases: `ZSC_MODEL`, `NER_MODEL`, `ZSC_MULTI_LABEL`,
-`ZSC_MAX_LEN`, `HF_HOME`, and `PORT`. Unprefixed `HOST` and `CORS_ORIGINS`
-are not supported. Unknown dotenv keys are ignored.
-
-Configuration (see `config.py` and `.env.example`):
-
-- NDM_ZSC_MODEL — zero‑shot model (default: NbAiLab/nb-bert-base-mnli)
-- NDM_NER_MODEL — NER model (default: NbAiLab/nb-bert-base-ner)
-- NDM_ZSC_REVISION / NDM_NER_REVISION — full 40-character commit SHAs (pinned defaults
-  in `model_specs.py`; update the corresponding revision when overriding a model ID)
-- NDM_ZSC_MULTI_LABEL — allow multiple labels (default: true)
-- NDM_ZSC_MAX_LEN — max input chars (default: 2048)
-- NDM_HF_HOME — HF cache (improves cold start)
-- NDM_HOST — local server host (default: 0.0.0.0)
-- NDM_PORT — server port, 1–65535 (default: 8080; PORT takes priority)
-- NDM_CORS_ORIGINS — JSON array, e.g. `NDM_CORS_ORIGINS=["http://localhost:3000"]`
-
-Compatibility changes: CORS now defaults to `[]` (no origins allowed), and an
-explicit `[]` stays empty. CSV origins are rejected; use a JSON array. Wildcard
-access requires explicitly setting `["*"]`. Ports outside 1–65535, nonpositive
-`NDM_ZSC_MAX_LEN`, and blank model IDs fail configuration loading before startup.
-Previously inconsistent ENV/dotenv alias and case handling is now uniform.
-
-`make run` and `python app.py` use the configured host/port without environment
-synchronization. Direct `uvicorn app:app` uses Uvicorn's own binding options;
-Docker/Compose launch configuration is unchanged in this stage.
-
-## Notes
-
-- Models are cached in ./.hf (mounted to /app/.hf in container). You can delete it to free space; models will re-download on next start.
-- The lock selects PyTorch CPU wheels for Linux x86_64 and PyPI arm64 wheels for macOS.
-  Other platforms are outside the locked target set. Linux container execution is pending.
-
-
-## Open:
-- [Swagger](http://localhost:8080/docs)
-- [ReDoc](http://localhost:8080/redoc)
-- [Health](http://localhost:8080/healthz)
-
-
-# 🚀 Deployment Guide ( Render, fastest & free)
-
-## 1. Prepare the repo
-
-- Push the `no-doc-mvp/` folder to a **public GitHub repository**.
-- Make sure you have:
-  - `Dockerfile`
-  - `.env.example`
-
----
-
-## 2. Create the service on Render
-
-1. Log in to [render.com](https://render.com).
-2. Go to **New → Web Service → Build & deploy from a Git repo**.
-3. Select your repository and the desired branch.
-4. Set the following options:
-   - **Environment:** `Docker`
-   - **Instance:** `Free (CPU)`
-   - **Port:** Render will automatically set `$PORT`
-
----
-
-## 3. Environment Variables
-
-Add the following in **Environment Variables**:
-
-```env
-NDM_ZSC_MODEL=NbAiLab/nb-bert-base-mnli
-NDM_NER_MODEL=NbAiLab/nb-bert-base-ner
-NDM_ZSC_MULTI_LABEL=false
-# optional
-NDM_HF_HOME=/app/.hf
-NDM_CORS_ORIGINS=["http://localhost:3000","https://my-ror-app.com"]
+```bash
+uv run --no-sync python scripts/runtime_offline_smoke.py \
+  --cache-dir /tmp/no-doc-smoke-cache/artifacts --report /tmp/no-doc-runtime-smoke.json
 ```
 
-## 4. Health Check & Verification
+Both commands write reports outside the repository. Local verification on macOS
+arm64 with Python 3.11 covered real CPU inference, offline cache reuse, application
+startup/readiness and graceful shutdown. Offline smoke checks block socket/DNS
+access and require local model artifacts.
 
-- **Health Check Path:** `/healthz`
-- After deployment, open `https://<your-app>.onrender.com/docs` in your browser — you can test the API directly there.
+## Current limitations
 
+- Classification currently processes only the first `NDM_ZSC_MAX_LEN` characters;
+  the tokenizer/model context window can impose an additional limit. Document
+  chunking and explicit token-budget rejection are not implemented yet.
+- NER currently trims input before inference, so offsets refer to the trimmed
+  string. Long-text behavior and original-input offset handling need improvement.
+- Request-size limits, label validation and the complete error contract are still
+  being hardened. Model accuracy, latency and memory requirements have not been
+  benchmarked. Successful smoke checks establish operability, not quality metrics.
+- Docker and Compose configurations are included, but container startup, cache
+  permissions and Linux inference have not been verified. Use the local path above
+  for the currently verified workflow; hosting tier suitability is unmeasured.
+
+## License and model terms
+
+The project source is licensed under [MIT](LICENSE). Model terms are separate;
+model weights are downloaded at runtime and are not included in this repository.
+
+- [NER model card](https://huggingface.co/NbAiLab/nb-bert-base-ner/blob/98083f61535300a7fb6d8b72c26873d47e81ac93/README.md): CC BY 4.0.
+- The classifier [model card](https://huggingface.co/NbAiLab/nb-bert-base-mnli/blob/171cd472d61d91ad6609530997e63ea98515efcb/README.md)
+  declares CC BY 4.0, while its [LICENSE](https://huggingface.co/NbAiLab/nb-bert-base-mnli/blob/171cd472d61d91ad6609530997e63ea98515efcb/LICENSE)
+  contains Apache 2.0 at the same revision. This inconsistency remains unresolved;
+  no established dual-license grant or fully cleared model-usage rights are claimed.

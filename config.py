@@ -34,8 +34,20 @@ class Settings(BaseSettings):
         2048, gt=0, validation_alias=AliasChoices("NDM_ZSC_MAX_LEN", "ZSC_MAX_LEN")
     )
     hf_home: Optional[str] = Field(
-        None, validation_alias=AliasChoices("NDM_HF_HOME", "HF_HOME")
+        None, validation_alias=AliasChoices("NDM_HF_HOME", "HF_HOME"),
+        description="Artifact cache directory passed as cache_dir; None uses HF defaults",
     )
+
+    offline: bool = False
+    cpu_threads: int = Field(2, ge=1, le=256)
+
+    @field_validator("hf_home")
+    @classmethod
+    def nonempty_cache_path(cls, value: Optional[str]) -> Optional[str]:
+        # This is the artifact cache directory itself, not a parent HF_HOME.
+        if value is not None and not value.strip():
+            raise ValueError("cache directory must not be blank")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",

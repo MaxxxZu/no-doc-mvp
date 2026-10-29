@@ -1,56 +1,41 @@
-# Project instructions
+# Contributor instructions
 
-## Project and communication
+## Project structure
 
-- This is a small Norwegian text classification and named entity recognition API
-  built with FastAPI and Hugging Face Transformers.
-- Communicate with the user in Russian. Keep code, identifiers, and public project
-  documentation in English unless requested otherwise.
-- Preserve the existing separation of API, services, Pydantic schemas, and settings.
-  Prefer focused changes over a rewrite or unnecessary infrastructure.
-- Describe only implemented capabilities. Do not call the project a RAG or
-  generative LLM system unless the code actually implements those capabilities.
+This project provides zero-shot classification and named entity recognition for
+Norwegian text using FastAPI and Hugging Face Transformers.
 
-## Starting work
+- `app.py`: application factory, routes and lifespan.
+- `config.py`: validated application settings.
+- `models/`: Pydantic HTTP request and response schemas.
+- `services/`: inference services, artifact loading and model runtime.
+- `model_specs.py`: default model IDs and pinned revisions.
+- `tests/`: fast tests using fake model dependencies.
+- `scripts/`: explicitly invoked real-model smoke checks.
 
-- Read applicable instructions, inspect the current branch and working tree, and
-  read the relevant source files before editing. Preserve all user changes.
-- Work only within the scope of the current user request. Opening the repository
-  or reading these instructions does not authorize implementation work.
-- The audit findings, implementation stages, acceptance criteria, and execution
-  prompts belong in docs/IMPLEMENTATION_ROADMAP.md, not in this file. That document
-  will be added separately. If present, read it before roadmap-related work;
-  if absent, do not create it or reconstruct its contents without a user request.
-- For requested implementation work, proceed incrementally and verify the result
-  before moving to the next authorized scope. Do not expand the task implicitly.
+## Engineering conventions
 
-## Authorization and safety
+- Preserve separation between HTTP handling, inference logic and model lifecycle.
+  Prefer small changes consistent with the existing architecture.
+- Keep models owned by the application runtime; do not load them at import time
+  or construct new pipelines per request.
+- Preserve explicit revisions, CPU execution, safetensors loading and disabled
+  remote code. Review model IDs and revisions together when changing artifacts.
+- Keep the default fast suite independent of model downloads and external network.
+  Separate real-model checks from mocked unit and integration tests.
+- With development dependencies available, run the relevant tests, Flake8 and
+  isort checks using the existing environment without implicit dependency sync.
+- Keep code and public documentation in English. Document actual behavior and
+  relevant limitations; report only verification that was actually performed.
+- Preserve unrelated changes and keep documentation aligned with affected APIs,
+  settings and launch commands.
 
-- Never commit, push, pull, merge, or deploy unless explicitly requested.
-- Do not create or switch branches unless requested or already authorized.
-- Running tests, installing/updating dependencies, downloading models, starting
-  Docker, and making external network requests require explicit authorization
-  covering those operations. A written plan is not authorization to execute it.
-- Existing authorization in the current session persists; do not ask for the same
-  permission repeatedly. Report checks that could not be performed.
-- Tool commands may install dependencies implicitly. For authorized checks use an
-  existing environment without automatic dependency sync unless installation is
-  also authorized. Do not trigger model downloads merely by importing or testing.
-- Do not overwrite the user's .env, expose secret values, log input documents,
-  delete model caches, or change existing cache permissions without authorization.
-- Use normal approval mechanisms for filesystem and sandbox restrictions. Do not
-  work around them. Do not spawn subagents unless explicitly requested by the
-  user or applicable instructions.
+## Repository hygiene
 
-## Verification and handoff
-
-- Distinguish static findings from behavior verified by execution. Do not claim
-  tests passed, models loaded, accuracy was measured, or Docker works without
-  having performed the corresponding authorized checks.
-- Use fake model dependencies for fast tests; keep actual model inference and
-  downloads in a separate explicitly invoked verification path.
-- Never assess NLP accuracy from model names or mocked responses. Record the
-  environment and relevant model/dependency versions for real-model evidence.
-- Keep documentation consistent with actual behavior and verified limitations.
-- At handoff summarize changed behavior, touched files, checks actually executed,
-  their results, remaining limitations, and any unperformed required checks.
+- Do not include secrets, private documents or personal machine paths in source,
+  logs, examples or documentation. Use synthetic test data and portable commands.
+- Keep environment files, caches, downloaded weights and generated verification
+  reports out of Git and container build contexts. Preserve the safe `.env.example`.
+- Public instructions must not depend on private files or link to ignored reports.
+- Treat project-source and model licenses separately; retain model attribution
+  and document unresolved model terms without assuming a license grant.

@@ -1,7 +1,7 @@
 def test_classify_endpoint_happy_path(client, monkeypatch):
     import app as app_module
 
-    def fake_classify_text_raw(text, labels=None, multi_label_override=None):
+    def fake_classify_text_raw(text, labels=None, multi_label_override=None, **kwargs):
         used_labels = labels or ["A", "B", "C"]
         scores = [0.9, 0.07, 0.03][: len(used_labels)]
         return used_labels, scores
