@@ -1,6 +1,7 @@
 from typing import List, TypedDict
 
 from services.model_loader import Pipeline
+from services.validation import check_tokens
 
 
 class NerPrediction(TypedDict):
@@ -12,7 +13,5 @@ class NerPrediction(TypedDict):
 
 
 def extract_entities_raw(text: str, pipeline: Pipeline) -> List[NerPrediction]:
-    t = (text or "").strip()
-    if not t:
-        return []
-    return pipeline(t)
+    check_tokens(pipeline, text)
+    return pipeline(text)

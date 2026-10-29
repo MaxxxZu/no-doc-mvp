@@ -92,7 +92,9 @@ aliases. Process `NDM_PORT`, for example, takes precedence over dotenv `PORT`.
 | `NDM_NER_MODEL` | `NbAiLab/nb-bert-base-ner` |
 | `NDM_ZSC_REVISION` / `NDM_NER_REVISION` | Full commit SHAs pinned in [model_specs.py](model_specs.py) |
 | `NDM_ZSC_MULTI_LABEL` | `true`; request-level override supported |
-| `NDM_ZSC_MAX_LEN` | `2048`; current classification character cutoff |
+| `NDM_ZSC_MAX_LEN` | `2048`; maximum original classification text length in code points |
+| `NDM_NER_MAX_LEN` | `2048`; maximum original NER text length in code points |
+| `NDM_BODY_MAX_BYTES` | `65536`; maximum received HTTP body bytes |
 
 Supported legacy aliases are `ZSC_MODEL`, `NER_MODEL`, `ZSC_MULTI_LABEL`,
 `ZSC_MAX_LEN`, `HF_HOME` and `PORT`. Unprefixed `HOST` and `CORS_ORIGINS` are ignored.
@@ -149,14 +151,23 @@ access and require local model artifacts.
 
 ## Current limitations
 
-- Classification currently processes only the first `NDM_ZSC_MAX_LEN` characters;
-  the tokenizer/model context window can impose an additional limit. Document
-  chunking and explicit token-budget rejection are not implemented yet.
-- NER currently trims input before inference, so offsets refer to the trimmed
-  string. Long-text behavior and original-input offset handling need improvement.
-- Request-size limits, label validation and the complete error contract are still
-  being hardened. Model accuracy, latency and memory requirements have not been
-  benchmarked. Successful smoke checks establish operability, not quality metrics.
+- Text is passed unchanged to inference. NER offsets are Python Unicode code point
+  indices into the original text, with inclusive `start` and exclusive `end`;
+  `word` is the corresponding original substring.
+- Both endpoints reject text above their character limits. Tokenization without
+  truncation checks each classification document/hypothesis pair and each NER
+  document, including special tokens, against the model and tokenizer capacity.
+  Unsupported model capacity fails inference. Chunking is not implemented.
+- Missing or null labels select defaults; otherwise provide 1–32 unique labels,
+  each 1–128 characters after trimming outer whitespace. Labels retain case.
+  The 2048-character limits bound preprocessing, while the 65536-byte body limit
+  leaves room for JSON encoding and labels; token limits can reject shorter text.
+- Errors use `{"error":{"code":"...","message":"..."}}`: invalid input and
+  `text_too_long` use 422, `body_too_large` uses 413, `runtime_unavailable` and
+  `inference_busy` use 503 with `Retry-After`, and `inference_failed` uses 500.
+  Invalid JSON or schemas use `invalid_input` (422).
+- Model accuracy, latency and memory requirements have not been benchmarked.
+  Successful smoke checks establish operability, not quality metrics.
 - Docker and Compose configurations are included, but container startup, cache
   permissions and Linux inference have not been verified. Use the local path above
   for the currently verified workflow; hosting tier suitability is unmeasured.
