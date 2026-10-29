@@ -29,7 +29,8 @@ def test_defaults(monkeypatch):
         "ner_model": "NbAiLab/nb-bert-base-ner", "zsc_multi_label": True,
         "zsc_revision": "171cd472d61d91ad6609530997e63ea98515efcb",
         "ner_revision": "98083f61535300a7fb6d8b72c26873d47e81ac93",
-        "zsc_max_len": 2048, "hf_home": None, "offline": False, "cpu_threads": 2,
+        "zsc_max_len": 2048, "ner_max_len": 2048, "body_max_bytes": 65536,
+        "hf_home": None, "offline": False, "cpu_threads": 2,
     }
 
 

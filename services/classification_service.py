@@ -1,7 +1,9 @@
+from collections.abc import Mapping
 from typing import List, Optional, Tuple
 
 from config import Settings
 from services.model_loader import Pipeline
+from services.validation import check_tokens, validate_classification
 
 DEFAULT_LABELS = [
     "rammetillatelse",
@@ -26,21 +28,22 @@ def classify_text_raw(
     multi_label_override: Optional[bool] = None,
 ) -> Tuple[List[str], List[float]]:
     """Return (labels, scores) sorted by descending score."""
-    t = (text or "").strip()
-    if not t:
-        return [], []
-
-    used_labels = labels or DEFAULT_LABELS
+    used_labels = DEFAULT_LABELS if labels is None else labels
     multi = settings.zsc_multi_label if multi_label_override is None else multi_label_override
-    if len(t) > settings.zsc_max_len:
-        t = t[: settings.zsc_max_len]
+    for label in used_labels:
+        check_tokens(pipeline, text, "Dette dokumentet handler om {}.".format(label))
 
     res = pipeline(
-        sequences=t,
+        sequences=text,
         candidate_labels=used_labels,
         multi_label=multi,
         hypothesis_template="Dette dokumentet handler om {}.",
     )
-    out_labels = list(res["labels"])
-    out_scores = [float(s) for s in res["scores"]]
+    if not isinstance(res, Mapping):
+        raise ValueError("Invalid classification result")
+    labels_result, scores_result = validate_classification(
+        (res["labels"], res["scores"]), used_labels,
+    )
+    out_labels = list(labels_result)
+    out_scores = [float(score) for score in scores_result]
     return out_labels, out_scores

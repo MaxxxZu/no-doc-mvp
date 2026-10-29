@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     zsc_max_len: int = Field(
         2048, gt=0, validation_alias=AliasChoices("NDM_ZSC_MAX_LEN", "ZSC_MAX_LEN")
     )
+    ner_max_len: int = Field(2048, gt=0)
+    body_max_bytes: int = Field(65536, gt=0)
     hf_home: Optional[str] = Field(
         None, validation_alias=AliasChoices("NDM_HF_HOME", "HF_HOME"),
         description="Artifact cache directory passed as cache_dir; None uses HF defaults",

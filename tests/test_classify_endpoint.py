@@ -23,4 +23,4 @@ def test_classify_endpoint_happy_path(client, monkeypatch):
 
 def test_classify_endpoint_empty_text(client):
     resp = client.post("/classify", json={"text": "   "})
-    assert resp.status_code == 400
+    assert resp.status_code == 422

@@ -90,7 +90,10 @@ def test_lifespan_readiness_health_and_load_counts(monkeypatch):
 
         def pipe(*args, **kw):
             inference.append(operation)
-            return [] if operation == "ner" else {"labels": ["A"], "scores": [0.9]}
+            if operation == "ner":
+                return []
+            return {"labels": kw["candidate_labels"],
+                    "scores": [0.9] * len(kw["candidate_labels"])}
         return pipe
 
     monkeypatch.setattr(module, "load_pipeline", loader)
@@ -140,7 +143,8 @@ def test_app_settings_reach_loaders_and_service(monkeypatch):
 
         def pipe(**kwargs):
             inputs.append(kwargs)
-            return {"labels": ["A"], "scores": [0.9]}
+            return {"labels": kwargs["candidate_labels"],
+                    "scores": [0.9] * len(kwargs["candidate_labels"])}
         return pipe if operation == "classify" else lambda text: []
 
     monkeypatch.setattr(module, "load_pipeline", loader)
@@ -148,11 +152,9 @@ def test_app_settings_reach_loaders_and_service(monkeypatch):
     second = Settings(_env_file=None, zsc_max_len=8, zsc_multi_label=True, hf_home="/second")
     for settings in (first, second):
         with TestClient(create_app(settings)) as client:
-            assert client.post("/classify", json={"text": "abcdefghij"}).status_code == 200
+            assert client.post("/classify", json={"text": "abcdefghij"}).status_code == 422
     assert [s for _, s in loads] == [first, first, second, second]
-    assert [(x["sequences"], x["multi_label"]) for x in inputs] == [
-        ("abc", False), ("abcdefgh", True),
-    ]
+    assert inputs == []
 
 
 @pytest.mark.parametrize("held,other", [("classify", "ner"), ("ner", "classify")])
@@ -167,7 +169,10 @@ def test_real_request_concurrency(client, held, other, separate_apps):
     def blocking(*args, **kwargs):
         entered.set()
         assert release.wait(5)
-        return [] if held == "ner" else {"labels": ["A"], "scores": [0.9]}
+        if held == "ner":
+            return []
+        return {"labels": kwargs["candidate_labels"],
+                "scores": [0.9] * len(kwargs["candidate_labels"])}
 
     def unexpected(*args, **kwargs):
         calls.append(other)

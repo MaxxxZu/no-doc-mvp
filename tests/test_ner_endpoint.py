@@ -30,4 +30,4 @@ def test_ner_endpoint_happy_path(client, monkeypatch):
 
 def test_ner_endpoint_empty_text(client):
     resp = client.post("/ner", json={"text": ""})
-    assert resp.status_code == 400
+    assert resp.status_code == 422

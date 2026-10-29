@@ -40,6 +40,7 @@ def main():
     from model_specs import NER_MODEL, NER_REVISION, ZSC_MODEL, ZSC_REVISION
     from services.model_loader import load_pipeline
     from services.runtime import ModelRuntime
+    from services.validation import InputTooLong, check_tokens, token_limit
 
     settings = Settings(
         _env_file=None, hf_home=str(args.cache_dir.resolve()), offline=True, cpu_threads=2,
@@ -76,6 +77,45 @@ def main():
             assert entities.json()["entities"]
             assert runtime.classifier is classifier and runtime.ner is ner
             assert calls == ["classify", "ner"]
+        original = "  \nOla Nordmann arbeider i Oslo kommune. 😀 e\u0301"
+        response = client.post("/ner", json={"text": original})
+        assert response.status_code == 200
+        for entity in response.json()["entities"]:
+            assert entity["word"] == original[entity["start"]:entity["end"]]
+        for pipe, hypothesis in ((ner, None), (classifier, "Dette dokumentet handler om test.")):
+            limit = token_limit(pipe)
+            count = 1
+            while True:
+                document = "a " * count
+                ids = pipe.tokenizer(document, hypothesis, add_special_tokens=True,
+                                     truncation=False)["input_ids"]
+                if len(ids) >= limit:
+                    break
+                count += 1
+            assert len(ids) == limit
+            check_tokens(pipe, document, hypothesis)
+            try:
+                check_tokens(pipe, document + "a ", hypothesis)
+            except InputTooLong:
+                pass
+            else:
+                raise AssertionError("Token boundary was not enforced")
+            endpoint = "/ner" if hypothesis is None else "/classify"
+            payload = {"text": document}
+            if hypothesis is not None:
+                payload["labels"] = ["test"]
+            assert client.post(endpoint, json=payload).status_code == 200
+            forward = pipe.model.forward
+
+            def no_forward(*args, **kwargs):
+                raise AssertionError("Oversized input reached model forward")
+
+            pipe.model.forward = no_forward
+            try:
+                payload["text"] += "a "
+                assert client.post(endpoint, json=payload).status_code == 422
+            finally:
+                pipe.model.forward = forward
         for pipe, revision in ((classifier, ZSC_REVISION), (ner, NER_REVISION)):
             assert pipe.model.config._commit_hash == revision
             assert next(pipe.model.parameters()).device.type == "cpu"
@@ -91,8 +131,9 @@ def main():
             "fastapi", "httpx", "anyio",
         )},
         "models": {ZSC_MODEL: ZSC_REVISION, NER_MODEL: NER_REVISION},
-        "load_order": calls, "requests_per_endpoint": 2, "pipeline_identity_reused": True,
+        "load_order": calls, "base_requests_per_endpoint": 2, "pipeline_identity_reused": True,
         "startup_readiness_shutdown": "passed", "accuracy": "not measured",
+        "token_boundary_api_and_original_offsets": "passed",
     }
     args.report.write_text(json.dumps(report, indent=2) + "\n")
     print(f"PASS: {args.report}")

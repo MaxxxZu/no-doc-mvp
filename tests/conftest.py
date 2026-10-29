@@ -44,7 +44,13 @@ def isolated_environment(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
     import config
+    import services.classification_service as classification
+    import services.ner_service as ner
     import services.runtime as runtime
+
+    # Legacy lifecycle tests use bare callables; boundary tests restore the real preflight.
+    monkeypatch.setattr(classification, "check_tokens", lambda *args: None)
+    monkeypatch.setattr(ner, "check_tokens", lambda *args: None)
 
     test_settings = config.Settings(_env_file=None)
     monkeypatch.setattr(config, "settings", test_settings)
